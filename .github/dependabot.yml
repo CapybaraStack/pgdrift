@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Cargo dependencies
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      sqlx:
+        patterns:
+          - "sqlx*"
+      tokio:
+        patterns:
+          - "tokio*"
+      clap:
+        patterns:
+          - "clap*"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

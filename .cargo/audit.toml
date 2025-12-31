@@ -1,0 +1,18 @@
+# Cargo audit configuration
+# See: https://rustsec.org/
+
+[advisories]
+# Ignored advisories - only add entries here with clear justification
+
+# RUSTSEC-2023-0071: RSA timing sidechannel (Marvin Attack)
+# Justification: sqlx-mysql is in Cargo.lock but not actually used.
+# We only use the 'postgres' feature of sqlx. The mysql backend depends on
+# rsa for MySQL's authentication protocol, but it's never compiled into our binary.
+# Verified with: cargo tree --edges normal -i rsa (returns "nothing to print")
+ignore = [
+    "RUSTSEC-2023-0071",
+]
+
+# Informational warnings - these are warnings only, not vulnerabilities
+# Show warnings for unmaintained crates, unsound code, and notices
+informational_warnings = ["unmaintained", "unsound", "notice"]
