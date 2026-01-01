@@ -85,6 +85,41 @@ pub fn recommend_index(
 ) -> Vec<IndexRecommendation> {
     let mut recommendations = Vec::new();
 
+    // Collect all high-density fields first to create a single consolidated GIN index
+    let high_density_fields: Vec<&FieldStats> = field_stats
+        .iter()
+        .filter(|s| {
+            s.occurrences >= config.min_occurences
+                && s.density >= config.high_density_threshold
+                && !matches!(
+                    get_dominant_type(s),
+                    Some(JsonType::Object) | Some(JsonType::Array)
+                )
+        })
+        .collect();
+
+    // If there are high-density fields, create a single GIN index recommendation
+    if !high_density_fields.is_empty() {
+        // Use the field with highest density as the primary field for the recommendation
+        let primary_field = high_density_fields
+            .iter()
+            .max_by(|a, b| {
+                a.density
+                    .partial_cmp(&b.density)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap();
+
+        recommendations.push(create_consolidated_gin_recommendation(
+            table,
+            column,
+            primary_field,
+            &high_density_fields,
+            IndexPriority::Medium,
+        ));
+    }
+
+    // Process other recommendations (partial GIN, B-tree)
     for stats in field_stats {
         if stats.occurrences < config.min_occurences {
             continue;
@@ -95,14 +130,12 @@ pub fn recommend_index(
             continue;
         }
 
+        // Skip high-density fields (already handled above)
         if stats.density >= config.high_density_threshold {
-            recommendations.push(create_gin_recommendation(
-                table,
-                column,
-                stats,
-                IndexPriority::Medium,
-            ));
-        } else if stats.density > 0.0 && stats.density <= config.medium_density_threshold {
+            continue;
+        }
+
+        if stats.density > 0.0 && stats.density <= config.medium_density_threshold {
             recommendations.push(create_partial_gin_recommendation(
                 table,
                 column,
@@ -150,36 +183,52 @@ fn is_scalar_type(json_type: Option<JsonType>) -> bool {
     )
 }
 
-fn create_gin_recommendation(
+fn create_consolidated_gin_recommendation(
     table: &str,
     column: &str,
-    stats: &FieldStats,
+    primary_stats: &FieldStats,
+    all_high_density: &[&FieldStats],
     priority: IndexPriority,
 ) -> IndexRecommendation {
-    let index_name = generate_index_name(table, column, &stats.path, "gin");
+    let index_name = generate_index_name(table, column, "gin", "gin");
+
+    // Create a list of all high-density fields with their densities
+    let field_list = all_high_density
+        .iter()
+        .map(|s| format!("{} ({:.1}%)", s.path, s.density * 100.0))
+        .collect::<Vec<_>>()
+        .join(", ");
+
     let sql = format!(
-        "-- GIN index for high-density field: {:.1}% of rows contain this field\n\
+        "-- GIN index for high-density fields: {}\n\
         CREATE INDEX {} ON {} USING GIN ({});",
-        stats.density * 100.0,
-        index_name,
-        table,
-        column
+        field_list, index_name, table, column
     );
 
-    IndexRecommendation {
-        field_path: stats.path.clone(),
-        index_type: IndexType::Gin,
-        priority,
-        reason: format!(
+    let reason = if all_high_density.len() == 1 {
+        format!(
             "High density ({:.1}%) - present in {}/{} samples. \
              GIN index enables fast JSONB queries (@>, ?, ?&, ?|)",
-            stats.density * 100.0,
-            stats.occurrences,
-            stats.total_samples
-        ),
+            primary_stats.density * 100.0,
+            primary_stats.occurrences,
+            primary_stats.total_samples
+        )
+    } else {
+        format!(
+            "{} high-density fields ({}). \
+             Single GIN index supports fast JSONB queries (@>, ?, ?&, ?|) for all fields.",
+            all_high_density.len(),
+            field_list
+        )
+    };
+
+    IndexRecommendation {
+        field_path: primary_stats.path.clone(),
+        index_type: IndexType::Gin,
+        priority,
+        reason,
         sql,
-        estimated_benefit:
-            "Improved query performance for existence checks and containment queries.".to_string(),
+        estimated_benefit: "Improved query performance for existence checks and containment queries across all high-density fields.".to_string(),
     }
 }
 
@@ -323,7 +372,9 @@ fn json_path_to_sql_conditions(path: &str) -> String {
 }
 
 fn escape_json_path(path: &str) -> String {
-    path.replace("[]", "").replace('\'', "''")
+    path.replace("[]", "") // Remove array notation
+        .replace('\'', "''") // Escape single quotes for SQL
+        .replace('.', ",") // Convert dots to commas for PostgreSQL {a,b,c} syntax
 }
 
 #[cfg(test)]
@@ -533,10 +584,13 @@ mod tests {
 
     #[test]
     fn test_json_path_escaping() {
-        assert_eq!(escape_json_path("user.email"), "user.email");
+        // Dots are converted to commas for PostgreSQL path syntax
+        assert_eq!(escape_json_path("user.email"), "user,email");
         assert_eq!(escape_json_path("tags[]"), "tags");
-        assert_eq!(escape_json_path("user's.name"), "user''s.name");
-        assert_eq!(escape_json_path("items[].price"), "items.price");
+        // Single quotes are escaped, dots become commas
+        assert_eq!(escape_json_path("user's.name"), "user''s,name");
+        // Array notation removed, dots become commas
+        assert_eq!(escape_json_path("items[].price"), "items,price");
     }
 
     #[test]
@@ -610,6 +664,50 @@ mod tests {
         assert!(gin.is_some());
         assert!(btree.is_some());
         assert!(partial.is_some());
+    }
+
+    #[test]
+    fn test_multiple_high_density_creates_single_gin() {
+        let mut stats1 = create_test_stats("email", 0.95, 950, 1000);
+        stats1.types.insert(JsonType::String, 950);
+
+        let mut stats2 = create_test_stats("name", 0.92, 920, 1000);
+        stats2.types.insert(JsonType::String, 920);
+
+        let mut stats3 = create_test_stats("status", 0.88, 880, 1000);
+        stats3.types.insert(JsonType::String, 880);
+
+        let mut stats4 = create_test_stats("user_id", 1.0, 1000, 1000);
+        stats4.types.insert(JsonType::String, 1000);
+
+        let config = IndexConfig::default();
+        let recommendations = recommend_index(
+            "users",
+            "metadata",
+            &[stats1, stats2, stats3, stats4],
+            &config,
+        );
+
+        // Should generate single GIN index, not four
+        let gin_count = recommendations
+            .iter()
+            .filter(|r| r.index_type == IndexType::Gin)
+            .count();
+        assert_eq!(
+            gin_count, 1,
+            "Should generate single GIN index for multiple high-density fields"
+        );
+
+        // Verify the recommendation mentions all fields
+        let gin_rec = recommendations
+            .iter()
+            .find(|r| r.index_type == IndexType::Gin)
+            .unwrap();
+        assert!(gin_rec.reason.contains("email") || gin_rec.sql.contains("email"));
+        assert!(gin_rec.reason.contains("name") || gin_rec.sql.contains("name"));
+        assert!(gin_rec.reason.contains("status") || gin_rec.sql.contains("status"));
+        assert!(gin_rec.reason.contains("user_id") || gin_rec.sql.contains("user_id"));
+        assert!(gin_rec.reason.contains("4 high-density fields"));
     }
 
     #[test]
