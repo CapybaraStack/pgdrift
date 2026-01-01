@@ -1,7 +1,14 @@
 [package]
 name = "pgdrift-db"
 version.workspace = true
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Database layer for pgdrift - PostgreSQL connection handling and sampling strategies"
 
 [dependencies]
 # DB layer handles PostgreSQL connections

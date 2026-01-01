@@ -41,12 +41,12 @@ The simplest way to build for development is to use `cargo build`:
 cargo build --release
 ```
 
-This compiles the binary and places it in `target/release/pgdrift-cli`.
+This compiles the binary and places it in `target/release/pgdrift`.
 
 For convenience, you can install it to your cargo bin directory:
 
 ```bash
-cargo install --path crates/pgdrift-cli
+cargo install --path crates/pgdrift
 ```
 
 ## Usage
@@ -58,14 +58,14 @@ pgdrift provides two main commands: `discover` and `analyze`.
 List all JSONB columns in your database:
 
 ```bash
-pgdrift-cli discover --database-url "postgres://user:pass@localhost/mydb"
+pgdrift discover --database-url "postgres://user:pass@localhost/mydb"
 ```
 
 You can also set the database URL via environment variable:
 
 ```bash
 export DATABASE_URL="postgres://user:pass@localhost/mydb"
-pgdrift-cli discover
+pgdrift discover
 ```
 
 **Example output:**
@@ -86,13 +86,13 @@ JSONB Columns Found:
 Run drift detection on a specific table and column:
 
 ```bash
-pgdrift-cli analyze users metadata --database-url $DATABASE_URL
+pgdrift analyze users metadata --database-url $DATABASE_URL
 ```
 
 By default, pgdrift samples 5,000 rows. You can adjust this:
 
 ```bash
-pgdrift-cli analyze users metadata --sample-size 10000
+pgdrift analyze users metadata --sample-size 10000
 ```
 
 **Example output:**
@@ -138,19 +138,19 @@ pgdrift supports three output formats:
 **Table format** (default): Human-readable ASCII tables with color coding
 
 ```bash
-pgdrift-cli analyze users metadata --format table
+pgdrift analyze users metadata --format table
 ```
 
 **JSON format**: Machine-readable output for programmatic processing
 
 ```bash
-pgdrift-cli analyze users metadata --format json > drift-report.json
+pgdrift analyze users metadata --format json > drift-report.json
 ```
 
 **Markdown format**: Copy-paste into GitHub issues or documentation
 
 ```bash
-pgdrift-cli analyze users metadata --format markdown > DRIFT_REPORT.md
+pgdrift analyze users metadata --format markdown > DRIFT_REPORT.md
 ```
 
 ### Production Safety
@@ -158,7 +158,7 @@ pgdrift-cli analyze users metadata --format markdown > DRIFT_REPORT.md
 When analyzing production databases, use the `--production-mode` flag. This enables additional safety checks and warnings:
 
 ```bash
-pgdrift-cli analyze users metadata --production-mode
+pgdrift analyze users metadata --production-mode
 ```
 
 pgdrift uses adaptive sampling strategies based on table size:
@@ -250,7 +250,7 @@ Run tests for a specific crate:
 ```bash
 cargo test -p pgdrift-core
 cargo test -p pgdrift-db
-cargo test -p pgdrift-cli
+cargo test -p pgdrift
 ```
 
 ### Test Coverage
@@ -278,7 +278,7 @@ pgdrift is structured as a Cargo workspace with three crates:
 
 - **pgdrift-core**: Analysis engine, drift detection algorithms, and core types
 - **pgdrift-db**: Database layer, connection pooling, and sampling strategies
-- **pgdrift-cli**: Command-line interface and output formatting
+- **pgdrift**: Command-line interface and output formatting
 
 This separation allows the analysis engine to be used as a library in other tools.
 
@@ -332,7 +332,7 @@ For production (read-only recommended):
 
 ```bash
 export DATABASE_URL="postgres://readonly_user:pass@prod.example.com:5432/prod_db"
-pgdrift-cli analyze users metadata --production-mode
+pgdrift analyze users metadata --production-mode
 ```
 
 ## Performance

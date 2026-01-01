@@ -1,5 +1,5 @@
-use pgdrift_cli::commands::discover;
-use pgdrift_cli::output::OutputFormat;
+use pgdrift::commands::discover;
+use pgdrift::output::OutputFormat;
 use pgdrift_db::fixtures;
 use pgdrift_db::test_utils::TestDb;
 

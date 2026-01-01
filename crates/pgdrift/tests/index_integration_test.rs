@@ -1,5 +1,5 @@
-use pgdrift_cli::commands::index;
-use pgdrift_cli::output::OutputFormat;
+use pgdrift::commands::index;
+use pgdrift::output::OutputFormat;
 use pgdrift_db::fixtures;
 use pgdrift_db::test_utils::TestDb;
 use serde_json::json;

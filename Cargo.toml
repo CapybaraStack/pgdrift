@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  "crates/pgdrift-cli",
+  "crates/pgdrift",
   "crates/pgdrift-core",
   "crates/pgdrift-db",
 ]
@@ -8,6 +8,13 @@ resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/capybarastack/pgdrift"
+homepage = "https://github.com/capybarastack/pgdrift"
+authors = ["Moeder Balla"]
+keywords = ["postgresql", "jsonb", "schema", "drift", "database"]
+categories = ["command-line-utilities", "database"]
 
 
 [workspace.dependencies]
