@@ -235,15 +235,17 @@ fn create_btree_extracted_recommendation(
         ),
         JsonType::Number => (
             format!(
-                "(({})::NUMERIC)",
-                format!("{} #>> '{{{}}}'", column, escape_json_path(&stats.path))
+                "(({} #>> '{{{}}}')::NUMERIC)",
+                column,
+                escape_json_path(&stats.path)
             ),
             "NUMERIC",
         ),
         JsonType::Boolean => (
             format!(
-                "(({})::BOOLEAN)",
-                format!("{} #>> '{{{}}}'", column, escape_json_path(&stats.path))
+                "(({} #>> '{{{}}}')::BOOLEAN)",
+                column,
+                escape_json_path(&stats.path)
             ),
             "BOOLEAN",
         ),
