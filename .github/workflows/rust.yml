@@ -47,6 +47,9 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      - name: Check publish readiness
+        run: cargo publish --dry-run --all-features
+
   # Test on multiple platforms
   test:
     name: Test on ${{ matrix.os }}

@@ -1,6 +1,6 @@
 [package]
 name = "pgdrift-core"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 
 [dependencies]
@@ -10,5 +10,5 @@ tokio = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
-pgdrift-db = { path = "../pgdrift-db" }
+pgdrift-db = { workspace = true }
 sqlx = { workspace = true }

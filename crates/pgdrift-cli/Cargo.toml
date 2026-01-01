@@ -1,6 +1,6 @@
 [package]
 name = "pgdrift-cli"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 
 [lib]
@@ -12,8 +12,8 @@ name = "pgdrift"
 path = "src/main.rs"
 
 [dependencies]
-pgdrift-core = { path = "../pgdrift-core/" }
-pgdrift-db = { path = "../pgdrift-db/" }
+pgdrift-core = { workspace = true }
+pgdrift-db = { workspace = true }
 clap = { workspace = true }
 colored = { workspace = true }
 indicatif = { workspace = true }
