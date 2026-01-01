@@ -53,6 +53,31 @@ enum Commands {
         #[arg(long)]
         production_mode: bool,
     },
+
+    /// Generate index recommendations for a jsonb column
+    Index {
+        /// DB connection URL
+        #[arg(short, long, env = "DATABASE_URL")]
+        database_url: String,
+
+        /// Table name
+        table: String,
+
+        /// Column name
+        column: String,
+
+        /// Output format
+        #[arg(short = 'f', long, value_enum, default_value = "table")]
+        format: output::OutputFormat,
+
+        /// Number of samples to analyze
+        #[arg(short, long, default_value = "5000")]
+        sample_size: usize,
+
+        /// Enable production mode
+        #[arg(long)]
+        production_mode: bool,
+    },
 }
 
 #[tokio::main]
@@ -75,6 +100,24 @@ async fn main() -> anyhow::Result<()> {
             production_mode,
         } => {
             commands::analyze::run(
+                &database_url,
+                &table,
+                &column,
+                sample_size,
+                format,
+                production_mode,
+            )
+            .await?;
+        }
+        Commands::Index {
+            database_url,
+            table,
+            column,
+            sample_size,
+            format,
+            production_mode,
+        } => {
+            commands::index::run(
                 &database_url,
                 &table,
                 &column,

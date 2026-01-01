@@ -299,3 +299,159 @@ fn print_analysis_table(result: &AnalysisResult) {
 
     println!();
 }
+
+#[derive(Tabled)]
+pub struct IndexRow {
+    #[tabled(rename = "Field Path")]
+    pub field_path: String,
+    #[tabled(rename = "Index Type")]
+    pub index_type: String,
+    #[tabled(rename = "Priority")]
+    pub priority: String,
+    #[tabled(rename = "Reason")]
+    pub reason: String,
+}
+
+impl From<&pgdrift_core::index::IndexRecommendation> for IndexRow {
+    fn from(rec: &pgdrift_core::index::IndexRecommendation) -> Self {
+        Self {
+            field_path: rec.field_path.clone(),
+            index_type: rec.index_type.to_name().to_string(),
+            priority: rec.priority.to_name().to_string(),
+            reason: rec.reason.clone(),
+        }
+    }
+}
+
+pub struct IndexRecommendationResult {
+    pub table: String,
+    pub column: String,
+    pub recommendations: Vec<pgdrift_core::index::IndexRecommendation>,
+}
+
+pub fn print_index_recommendations(result: &IndexRecommendationResult, format: &OutputFormat) {
+    match format {
+        OutputFormat::Table => print_index_recommendations_table(result),
+        OutputFormat::Json => print_index_recommendations_json(result),
+        OutputFormat::Markdown => print_index_recommendations_markdown(result),
+    }
+}
+
+fn print_index_recommendations_json(result: &IndexRecommendationResult) {
+    let output = json!({
+        "table": result.table,
+        "column": result.column,
+        "recommendations": result.recommendations,
+        "summary": {
+            "total_recommendations": result.recommendations.len(),
+            "high_priority": result.recommendations.iter().filter(|r| r.priority == pgdrift_core::index::IndexPriority::High).count(),
+            "medium_priority": result.recommendations.iter().filter(|r| r.priority == pgdrift_core::index::IndexPriority::Medium).count(),
+            "low_priority": result.recommendations.iter().filter(|r| r.priority == pgdrift_core::index::IndexPriority::Low).count(),
+        }
+    });
+    println!("{}", serde_json::to_string_pretty(&output).unwrap());
+}
+
+fn print_index_recommendations_markdown(result: &IndexRecommendationResult) {
+    println!(
+        "# Index Recommendations: {}.{}\n",
+        result.table, result.column
+    );
+
+    if result.recommendations.is_empty() {
+        println!("**No index recommendations.**\n");
+        println!("This could mean:\n");
+        println!("- All fields have low occurrence counts (< 100 samples)");
+        println!("- All fields are objects or arrays (not directly indexable)");
+        println!("- Field densities are in the middle range without strong indexing needs\n");
+        return;
+    }
+
+    println!("Found {} recommendation(s)\n", result.recommendations.len());
+
+    println!("| Field Path | Index Type | Priority | Reason |");
+    println!("|------------|------------|----------|--------|");
+    for rec in &result.recommendations {
+        println!(
+            "| {} | {} | {} | {} |",
+            rec.field_path,
+            rec.index_type.to_name(),
+            rec.priority.to_name(),
+            rec.reason
+        );
+    }
+
+    println!("\n## SQL Commands\n");
+    for (i, rec) in result.recommendations.iter().enumerate() {
+        println!("### {} - {}\n", i + 1, rec.field_path);
+        println!("```sql\n{}\n```\n", rec.sql);
+        println!("**Estimated Benefit:** {}\n", rec.estimated_benefit);
+    }
+}
+
+fn print_index_recommendations_table(result: &IndexRecommendationResult) {
+    println!(
+        "\n{} {}.{}\n",
+        "Index Recommendations for".bold().green(),
+        result.table,
+        result.column
+    );
+
+    if result.recommendations.is_empty() {
+        println!("{}", "No index recommendations.".yellow());
+        println!("\n{}", "This could mean:".bold());
+        println!("  • All fields have low occurrence counts (< 100 samples)");
+        println!("  • All fields are objects or arrays (not directly indexable)");
+        println!("  • Field densities are in the middle range without strong indexing needs\n");
+        return;
+    }
+
+    println!("{}", "Summary:".bold());
+    println!("  Total recommendations: {}", result.recommendations.len());
+    let high_count = result
+        .recommendations
+        .iter()
+        .filter(|r| r.priority == pgdrift_core::index::IndexPriority::High)
+        .count();
+    let medium_count = result
+        .recommendations
+        .iter()
+        .filter(|r| r.priority == pgdrift_core::index::IndexPriority::Medium)
+        .count();
+    let low_count = result
+        .recommendations
+        .iter()
+        .filter(|r| r.priority == pgdrift_core::index::IndexPriority::Low)
+        .count();
+
+    if high_count > 0 {
+        println!("  High priority: {}", high_count.to_string().red());
+    }
+    if medium_count > 0 {
+        println!("  Medium priority: {}", medium_count.to_string().yellow());
+    }
+    if low_count > 0 {
+        println!("  Low priority: {}", low_count.to_string().cyan());
+    }
+
+    // Print recommendations table
+    println!("\n{}", "Recommendations:".bold());
+    let rows: Vec<IndexRow> = result.recommendations.iter().map(|r| r.into()).collect();
+    let mut table = Table::new(rows);
+    table.with(Style::rounded());
+    println!("{}", table);
+
+    // Print SQL commands
+    println!("\n{}", "SQL Commands:".bold().green());
+    for (i, rec) in result.recommendations.iter().enumerate() {
+        println!(
+            "\n{} - {}",
+            (i + 1).to_string().bold(),
+            rec.field_path.bold()
+        );
+        println!("{}", rec.sql.dimmed());
+        println!("{} {}", "Benefit:".bold(), rec.estimated_benefit);
+    }
+
+    println!();
+}
