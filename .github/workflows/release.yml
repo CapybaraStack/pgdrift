@@ -5,6 +5,9 @@ on:
     tags:
       - "v*.*.*"
 
+permissions:
+  contents: write
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -12,6 +15,8 @@ jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       version: ${{ steps.get_version.outputs.version }}
@@ -30,14 +35,12 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: pgdrift ${{ steps.get_version.outputs.version }}
+          name: pgdrift ${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: ${{ steps.get_version.outputs.is_prerelease }}
+          generate_release_notes: false
           body: |
             ## Installation
 
@@ -73,7 +76,7 @@ jobs:
             Download `pgdrift-windows-x86_64.exe` and add to your PATH.
 
             ## Checksums
-            See `checksums.txt` for SHA256 checksums of all binaries.
+            SHA256 checksums are provided as `.sha256` files for each binary in the release assets.
 
   publish-crates:
     name: Publish to crates.io
@@ -107,6 +110,8 @@ jobs:
     name: Build ${{ matrix.target }}
     needs: create-release
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -159,56 +164,26 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: strip target/${{ matrix.target }}/release/${{ matrix.binary_name }}
 
+      - name: Rename binary
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          cp ${{ matrix.binary_name }} ${{ matrix.asset_name }}
+
       - name: Create checksum
         shell: bash
         run: |
           cd target/${{ matrix.target }}/release
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            sha256sum ${{ matrix.binary_name }} > ${{ matrix.asset_name }}.sha256
+            sha256sum ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
           else
-            shasum -a 256 ${{ matrix.binary_name }} > ${{ matrix.asset_name }}.sha256
+            shasum -a 256 ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
           fi
 
-      - name: Upload binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: target/${{ matrix.target }}/release/${{ matrix.binary_name }}
-          asset_name: ${{ matrix.asset_name }}
-          asset_content_type: application/octet-stream
+          files: |
+            target/${{ matrix.target }}/release/${{ matrix.asset_name }}
+            target/${{ matrix.target }}/release/${{ matrix.asset_name }}.sha256
 
-      - name: Upload checksum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: target/${{ matrix.target }}/release/${{ matrix.asset_name }}.sha256
-          asset_name: ${{ matrix.asset_name }}.sha256
-          asset_content_type: text/plain
-
-  build-checksums:
-    name: Generate combined checksums
-    needs: [create-release, build-release]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v7
-
-      - name: Generate combined checksums
-        run: |
-          echo "# SHA256 Checksums for pgdrift ${{ needs.create-release.outputs.version }}" > checksums.txt
-          echo "" >> checksums.txt
-          cat **/*.sha256 >> checksums.txt || true
-
-      - name: Upload combined checksums
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: checksums.txt
-          asset_name: checksums.txt
-          asset_content_type: text/plain
