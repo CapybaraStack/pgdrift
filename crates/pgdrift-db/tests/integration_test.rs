@@ -107,7 +107,8 @@ async fn test_sampler_auto_select_random_strategy() {
         .expect("Failed to create fixture");
 
     // Small table (5000 rows) should use Random strategy
-    let sampler = Sampler::new(&test_db.pool, "public", "users", Some(5000), 10_000)
+    // Request fewer samples than rows to trigger Random sampling
+    let sampler = Sampler::new(&test_db.pool, "public", "users", Some(5000), 100)
         .await
         .expect("Failed to create sampler");
 
