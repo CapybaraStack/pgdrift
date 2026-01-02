@@ -79,6 +79,7 @@ jobs:
     name: Publish to crates.io
     needs: create-release
     runs-on: ubuntu-latest
+    environment: CICD
     steps:
       - uses: actions/checkout@v6
 
