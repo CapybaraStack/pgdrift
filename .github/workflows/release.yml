@@ -91,6 +91,13 @@ jobs:
             sudo mv pgdrift /usr/local/bin/
             ```
 
+            #### Linux (ARM64)
+            ```bash
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/pgdrift-linux-aarch64 -o pgdrift
+            chmod +x pgdrift
+            sudo mv pgdrift /usr/local/bin/
+            ```
+
             #### macOS (Intel)
             ```bash
             curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/pgdrift-macos-x86_64 -o pgdrift
@@ -155,6 +162,12 @@ jobs:
             binary_name: pgdrift
             asset_name: pgdrift-linux-x86_64
 
+          # Linux aarch64 (ARM64)
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            binary_name: pgdrift
+            asset_name: pgdrift-linux-aarch64
+
           # macOS x86_64 (Intel)
           - os: macos-latest
             target: x86_64-apple-darwin
@@ -181,6 +194,21 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Install cross-compilation tools (ARM)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Configure cargo for cross-compilation (ARM)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          mkdir -p ~/.cargo
+          cat >> ~/.cargo/config.toml <<EOF
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          EOF
+
       - name: Cache cargo
         uses: actions/cache@v5
         with:
@@ -195,7 +223,13 @@ jobs:
 
       - name: Strip binary (Linux/macOS)
         if: matrix.os != 'windows-latest'
-        run: strip target/${{ matrix.target }}/release/${{ matrix.binary_name }}
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            aarch64-linux-gnu-strip target/${{ matrix.target }}/release/${{ matrix.binary_name }}
+          else
+            strip target/${{ matrix.target }}/release/${{ matrix.binary_name }}
+          fi
 
       - name: Rename binary
         shell: bash
