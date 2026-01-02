@@ -6,6 +6,10 @@ use sqlx::PgPool;
 /// Sampling strategy selection based on table size
 #[derive(Debug, Clone, PartialEq)]
 pub enum SamplingStrategy {
+    /// Full table scan - when sample_size >= row_count
+    /// No randomization, deterministic results
+    Full,
+
     /// Random sampling for smaller tables (< 100k rows)
     /// Simple ORDER BY Random() LIMIT N
     Random { limit: usize },
@@ -38,24 +42,26 @@ impl SamplingStrategy {
             _ => crate::discovery::get_row_count(pool, schema, table).await?,
         };
 
-        // Cap sample_size at actual row count to avoid duplicate sampling
-        let effective_sample_size = sample_size.min(row_count as usize);
+        // If requesting all or more rows than exist, do a full deterministic scan
+        if sample_size >= row_count as usize {
+            return Ok(Self::Full);
+        }
 
         Ok(match row_count {
             n if n < 100_000 => Self::Random {
-                limit: effective_sample_size,
+                limit: sample_size,
             },
             n if n < 10_000_000 => {
                 // try to find pk for Reservoir sampling
                 match find_primary_key(pool, schema, table).await {
                     Ok(pk) => Self::ReservoirPK {
-                        sample_size: effective_sample_size,
+                        sample_size,
                         pk,
                     },
                     Err(_) => {
                         // Fallback to random pk
                         Self::Random {
-                            limit: effective_sample_size,
+                            limit: sample_size,
                         }
                     }
                 }
@@ -64,10 +70,10 @@ impl SamplingStrategy {
                 // for very large tables
                 // Cap percentage at 100.0 (PostgreSQL limit) and minimum 0.1
                 let pct =
-                    (effective_sample_size as f32 / row_count as f32 * 100.0).clamp(0.1, 100.0);
+                    (sample_size as f32 / row_count as f32 * 100.0).clamp(0.1, 100.0);
                 Self::TableSample {
                     percentage: pct,
-                    limit: effective_sample_size,
+                    limit: sample_size,
                 }
             }
         })
@@ -76,6 +82,7 @@ impl SamplingStrategy {
     /// Get the max number of samples that this strat should return
     pub fn max_samples(&self) -> usize {
         match self {
+            Self::Full => usize::MAX, // Full scan - unknown size
             Self::Random { limit } => *limit,
             Self::ReservoirPK { sample_size, .. } => *sample_size,
             Self::TableSample { limit, .. } => *limit,
@@ -88,6 +95,13 @@ impl SamplingStrategy {
         let column_quoted = quote_identifier(column);
 
         match self {
+            Self::Full => {
+                // Full table scan - deterministic, no randomization
+                format!(
+                    "SELECT {} FROM {}.{} WHERE {} IS NOT NULL",
+                    column_quoted, schema_quoted, table_quoted, column_quoted
+                )
+            }
             Self::Random { limit } => {
                 format!(
                     "SELECT {} FROM {}.{} WHERE {} IS NOT NULL ORDER BY random() LIMIT {}",
@@ -240,6 +254,9 @@ impl Sampler {
     /// Get information about the sampling strategy
     pub fn strategy_info(&self) -> String {
         match &self.strategy {
+            SamplingStrategy::Full => {
+                "Full table scan (all non-NULL rows)".to_string()
+            }
             SamplingStrategy::Random { limit } => {
                 format!("Random sampling (up to {} rows)", limit)
             }
