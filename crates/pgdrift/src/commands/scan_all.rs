@@ -5,12 +5,7 @@ use pgdrift_core::drift::{DriftConfig, DriftIssue, Severity, detect_drift};
 use pgdrift_db::{ConnectionPool, Sampler, discover_jsonb_columns};
 
 /// Run scan-all command to analyze all JSONB columns in the given DB
-pub async fn run(
-    database_url: &str,
-    sample_size: usize,
-    format: OutputFormat,
-    production_mode: bool,
-) -> Result<()> {
+pub async fn run(database_url: &str, sample_size: usize, format: OutputFormat) -> Result<()> {
     let conn = ConnectionPool::new(database_url)
         .await
         .context("Failed to connect to the database")?;
@@ -48,7 +43,6 @@ pub async fn run(
             &col.table,
             &col.column,
             sample_size,
-            production_mode,
             &config,
         )
         .await
@@ -120,13 +114,11 @@ async fn analyze_column(
     table: &str,
     column: &str,
     sample_size: usize,
-    production_mode: bool,
     config: &DriftConfig,
 ) -> Result<(usize, Vec<DriftIssue>)> {
     let sampler = Sampler::new(pool, schema, table, None, sample_size)
         .await
         .context("Failed to create sampler")?
-        .production_mode(production_mode)
         .show_progress(false);
 
     let samples = sampler

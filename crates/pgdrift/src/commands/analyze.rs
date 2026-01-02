@@ -11,7 +11,6 @@ pub async fn run(
     column: &str,
     sample_size: usize,
     format: OutputFormat,
-    production_mode: bool,
 ) -> Result<()> {
     let (schema, table) = parse_table_name(table);
 
@@ -26,7 +25,6 @@ pub async fn run(
     let sampler = Sampler::new(conn.pool(), &schema, &table, None, sample_size)
         .await
         .context("Failed to create sampler")?
-        .production_mode(production_mode)
         .show_progress(true);
 
     println!("\nSampling Strategy: {}", sampler.strategy_info());

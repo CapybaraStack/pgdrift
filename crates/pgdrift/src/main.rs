@@ -48,10 +48,6 @@ enum Commands {
         /// Number of samples to analyze
         #[arg(short, long, default_value = "5000")]
         sample_size: usize,
-
-        /// Enable production mode
-        #[arg(long)]
-        production_mode: bool,
     },
 
     /// Generate index recommendations for a jsonb column
@@ -73,10 +69,6 @@ enum Commands {
         /// Number of samples to analyze
         #[arg(short, long, default_value = "5000")]
         sample_size: usize,
-
-        /// Enable production mode
-        #[arg(long)]
-        production_mode: bool,
     },
 
     /// Scan all jsonb columns in the database for drift
@@ -92,10 +84,6 @@ enum Commands {
         /// Number of samples to analyze per column
         #[arg(short, long, default_value = "5000")]
         sample_size: usize,
-
-        /// Enable production mode
-        #[arg(long)]
-        production_mode: bool,
     },
 }
 
@@ -116,17 +104,8 @@ async fn main() -> anyhow::Result<()> {
             column,
             sample_size,
             format,
-            production_mode,
         } => {
-            commands::analyze::run(
-                &database_url,
-                &table,
-                &column,
-                sample_size,
-                format,
-                production_mode,
-            )
-            .await?;
+            commands::analyze::run(&database_url, &table, &column, sample_size, format).await?;
         }
         Commands::Index {
             database_url,
@@ -134,25 +113,15 @@ async fn main() -> anyhow::Result<()> {
             column,
             sample_size,
             format,
-            production_mode,
         } => {
-            commands::index::run(
-                &database_url,
-                &table,
-                &column,
-                sample_size,
-                format,
-                production_mode,
-            )
-            .await?;
+            commands::index::run(&database_url, &table, &column, sample_size, format).await?;
         }
         Commands::ScanAll {
             database_url,
             sample_size,
             format,
-            production_mode,
         } => {
-            commands::scan_all::run(&database_url, sample_size, format, production_mode).await?;
+            commands::scan_all::run(&database_url, sample_size, format).await?;
         }
     }
     Ok(())

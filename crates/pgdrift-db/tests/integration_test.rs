@@ -228,30 +228,6 @@ async fn test_sampler_tablesample_strategy_selection() {
 }
 
 #[tokio::test]
-async fn test_sampler_production_mode() {
-    let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    pgdrift_db::fixtures::create_users_consistent(&test_db.pool)
-        .await
-        .expect("Failed to create fixture");
-
-    // Create sampler with production mode enabled
-    let sampler = Sampler::with_strategy(SamplingStrategy::Random { limit: 50 })
-        .production_mode(true)
-        .show_progress(false);
-
-    let samples = sampler
-        .sample(&test_db.pool, "public", "users", "metadata")
-        .await
-        .expect("Failed to sample in production mode");
-
-    assert!(!samples.is_empty(), "Expected samples in production mode");
-    assert!(samples.len() <= 50, "Production mode should respect limits");
-
-    test_db.cleanup().await.expect("Failed to cleanup");
-}
-
-#[tokio::test]
 async fn test_sampler_handles_null_values() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 

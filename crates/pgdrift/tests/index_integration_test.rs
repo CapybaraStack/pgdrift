@@ -22,7 +22,6 @@ async fn test_index_recommendations_consistent_schema() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -45,7 +44,6 @@ async fn test_index_recommendations_sparse_fields() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -68,7 +66,6 @@ async fn test_index_recommendations_type_inconsistency() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -91,7 +88,6 @@ async fn test_index_with_table_format() {
         "metadata",
         1000,
         OutputFormat::Table,
-        false,
     )
     .await;
 
@@ -114,7 +110,6 @@ async fn test_index_with_markdown_format() {
         "metadata",
         1000,
         OutputFormat::Markdown,
-        false,
     )
     .await;
 
@@ -137,30 +132,6 @@ async fn test_index_with_schema_table_notation() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
-    )
-    .await;
-
-    assert!(result.is_ok(), "Index command failed: {:?}", result.err());
-
-    test_db.cleanup().await.expect("Failed to cleanup");
-}
-
-#[tokio::test]
-async fn test_index_with_production_mode() {
-    let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    fixtures::create_users_consistent(&test_db.pool)
-        .await
-        .expect("Failed to create fixture");
-
-    let result = index::run(
-        test_db.database_url(),
-        "users",
-        "metadata",
-        1000,
-        OutputFormat::Json,
-        true, // production_mode
     )
     .await;
 
@@ -183,7 +154,6 @@ async fn test_index_with_custom_sample_size() {
         "metadata",
         100, // small sample size
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -210,7 +180,6 @@ async fn test_index_invalid_table() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -236,7 +205,6 @@ async fn test_index_invalid_column() {
         "nonexistent_column",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -256,7 +224,6 @@ async fn test_index_invalid_database_url() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -293,7 +260,6 @@ async fn test_index_empty_column() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -343,7 +309,6 @@ async fn test_index_with_high_density_strings() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -392,7 +357,6 @@ async fn test_index_with_number_fields() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -441,7 +405,6 @@ async fn test_index_with_boolean_fields() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -468,7 +431,6 @@ async fn test_index_sql_injection_in_table_name() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -502,7 +464,6 @@ async fn test_index_sql_injection_in_column_name() {
         "metadata; DROP TABLE users; --",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 

@@ -276,13 +276,7 @@ pgdrift analyze users metadata --format json > drift-report.json
 pgdrift analyze users metadata --format markdown > DRIFT_REPORT.md
 ```
 
-### Production Safety
-
-When analyzing production databases, use the `--production-mode` flag. This enables additional safety checks and warnings:
-
-```bash
-pgdrift analyze users metadata --production-mode
-```
+### Adaptive Sampling Strategies
 
 pgdrift uses adaptive sampling strategies based on table size:
 
@@ -457,7 +451,7 @@ For production (read-only recommended):
 
 ```bash
 export DATABASE_URL="postgres://readonly_user:pass@prod.example.com:5432/prod_db"
-pgdrift analyze users metadata --production-mode
+pgdrift analyze users metadata
 ```
 
 ## Performance

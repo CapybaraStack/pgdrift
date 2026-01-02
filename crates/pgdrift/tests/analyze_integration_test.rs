@@ -19,7 +19,6 @@ async fn test_analyze_consistent_schema() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -44,7 +43,6 @@ async fn test_analyze_detects_type_inconsistency() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -69,7 +67,6 @@ async fn test_analyze_detects_ghost_keys() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -94,7 +91,6 @@ async fn test_analyze_handles_deep_nesting() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -119,32 +115,6 @@ async fn test_analyze_with_schema_prefix() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
-    )
-    .await;
-
-    assert!(result.is_ok(), "Analyze command failed: {:?}", result.err());
-
-    test_db.cleanup().await.expect("Failed to cleanup");
-}
-
-/// Test analyze command with production mode
-#[tokio::test]
-async fn test_analyze_production_mode() {
-    let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    fixtures::create_users_consistent(&test_db.pool)
-        .await
-        .expect("Failed to create fixture");
-
-    // Run analyze in production mode
-    let result = analyze::run(
-        test_db.database_url(),
-        "users",
-        "metadata",
-        1000,
-        OutputFormat::Json,
-        true, // production_mode = true
     )
     .await;
 
@@ -174,7 +144,6 @@ async fn test_analyze_output_formats() {
             "metadata",
             1000,
             format.clone(),
-            false,
         )
         .await;
 
@@ -201,7 +170,6 @@ async fn test_analyze_invalid_table() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -226,7 +194,6 @@ async fn test_analyze_invalid_column() {
         "nonexistent_column",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -258,7 +225,6 @@ async fn test_analyze_empty_column() {
         "data",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -289,7 +255,6 @@ async fn test_analyze_detects_schema_evolution() {
         "data",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -307,7 +272,6 @@ async fn test_analyze_invalid_database_url() {
         "metadata",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -347,7 +311,6 @@ async fn test_analyze_all_null_column() {
         "data",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -401,7 +364,6 @@ async fn test_analyze_mixed_null_values() {
         "data",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -438,7 +400,6 @@ async fn test_analyze_sql_injection_table_name() {
             "metadata",
             1000,
             OutputFormat::Json,
-            false,
         )
         .await;
 
@@ -479,7 +440,6 @@ async fn test_analyze_sql_injection_column_name() {
             attempt,
             1000,
             OutputFormat::Json,
-            false,
         )
         .await;
 
@@ -542,7 +502,6 @@ async fn test_analyze_large_json_documents() {
         "data",
         100,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -609,7 +568,6 @@ async fn test_analyze_unicode_and_special_chars() {
         "data",
         100,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -653,7 +611,6 @@ async fn test_analyze_empty_json_objects() {
         "data",
         100,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -707,7 +664,6 @@ async fn test_analyze_mixed_empty_objects() {
         "data",
         1000,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -759,7 +715,6 @@ async fn test_analyze_extreme_nesting_depth() {
         "data",
         10,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -812,7 +767,6 @@ async fn test_analyze_field_type_mutation() {
         "data",
         100,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -868,7 +822,6 @@ async fn test_analyze_mixed_type_arrays() {
         "data",
         100,
         OutputFormat::Json,
-        false,
     )
     .await;
 
@@ -924,7 +877,6 @@ async fn test_analyze_inconsistent_nesting_levels() {
         "data",
         100,
         OutputFormat::Json,
-        false,
     )
     .await;
 

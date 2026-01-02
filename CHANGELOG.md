@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Core Commands
+
 - **`pgdrift discover`** - Discover all JSONB columns in a PostgreSQL database
   - Lists schema, table, column, and estimated row counts
   - Supports table, JSON, and markdown output formats
@@ -21,7 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Detects missing required fields (expected fields present in 80-95% of records)
   - Analyzes schema evolution patterns
   - Configurable sample size (default: 5000 rows)
-  - Production mode with additional safety checks
 
 - **`pgdrift scan-all`** - Scan all JSONB columns in the database
   - Database-wide drift analysis
@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Provides estimated performance benefits
 
 #### Database Layer
+
 - Adaptive sampling strategies based on table size:
   - Random sampling for small tables (<100k rows)
   - Reservoir sampling via primary key index for medium tables (100k-10M rows)
@@ -46,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SQL injection protection for all user inputs
 
 #### Analysis Engine
+
 - Recursive JSON tree walker supporting nested objects and arrays
 - Field path notation: dot notation for nesting (`user.email`), bracket notation for arrays (`addresses[].city`)
 - Comprehensive field statistics tracking:
@@ -58,11 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Severity-based issue categorization (Critical, Warning, Info)
 
 #### Output Formats
+
 - **Table format**: Colored ASCII tables with severity highlighting
 - **JSON format**: Machine-readable output for programmatic processing
 - **Markdown format**: Copy-paste ready for GitHub issues and documentation
 
 #### Testing & Quality
+
 - **149 total tests** (88 unit tests + 61 integration tests)
 - Integration tests using testcontainers for real PostgreSQL environments
 - Comprehensive edge case coverage:
@@ -74,24 +78,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test fixtures representing common drift scenarios
 
 #### CI/CD & Tooling
+
 - GitHub Actions CI pipeline testing on Linux, macOS, and Windows
 - GitHub Actions release workflow for multi-platform binary distribution
 - Security audit configuration with cargo-audit
 - Automated testing on every commit
 
 ### Performance
+
 - Analyzes 10,000 samples in under 10 seconds for typical schemas
 - Peak memory usage under 500MB
 - Minimal production impact with read-only queries
 
 ### Documentation
+
 - Comprehensive README with usage examples for all commands
 - Example outputs for discover, analyze, scan-all, and index commands
 - Drift detection logic explanation with threshold details
-- Production safety guidelines
 - Architecture documentation
 
 ### Technical Details
+
 - **Crate structure**: Workspace with three crates (pgdrift-core, pgdrift-db, pgdrift)
 - **License**: MIT
 - **Rust version**: 1.75+

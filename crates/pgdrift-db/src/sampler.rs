@@ -138,7 +138,6 @@ impl SamplingStrategy {
 
 pub struct Sampler {
     strategy: SamplingStrategy,
-    production_mode: bool,
     show_progress: bool,
 }
 
@@ -155,7 +154,6 @@ impl Sampler {
             SamplingStrategy::auto_select(pool, schema, table, estimated_rows, sample_size).await?;
         Ok(Self {
             strategy,
-            production_mode: false,
             show_progress: true,
         })
     }
@@ -164,15 +162,8 @@ impl Sampler {
     pub fn with_strategy(strategy: SamplingStrategy) -> Self {
         Self {
             strategy,
-            production_mode: false,
             show_progress: true,
         }
-    }
-
-    /// Enable prod mode
-    pub fn production_mode(mut self, enabled: bool) -> Self {
-        self.production_mode = enabled;
-        self
     }
 
     /// Enable or disable prog bar
@@ -195,18 +186,6 @@ impl Sampler {
         table: &str,
         column: &str,
     ) -> Result<Vec<Value>, sqlx::Error> {
-        // Production mode safety check
-        if self.production_mode
-            && let SamplingStrategy::TableSample { percentage, .. } = &self.strategy
-            && *percentage > 1.0
-        {
-            eprintln!(
-                "WARNING: Production mode limits sampling to 1%. Reducing from {:.2}%",
-                percentage
-            );
-            // In a real implementation, we'd adjust the strategy here
-        }
-
         let query = self.strategy.build_query(schema, table, column);
         let max_samples = self.strategy.max_samples();
 
@@ -368,12 +347,9 @@ mod tests {
     #[test]
     fn test_sampler_builder() {
         let strategy = SamplingStrategy::Random { limit: 1000 };
-        let sampler = Sampler::with_strategy(strategy.clone())
-            .production_mode(true)
-            .show_progress(false);
+        let sampler = Sampler::with_strategy(strategy.clone()).show_progress(false);
 
         assert_eq!(sampler.strategy, strategy);
-        assert!(sampler.production_mode);
         assert!(!sampler.show_progress);
     }
 
@@ -382,7 +358,6 @@ mod tests {
         let strategy = SamplingStrategy::Random { limit: 5000 };
         let sampler = Sampler::with_strategy(strategy);
 
-        assert!(!sampler.production_mode);
         assert!(sampler.show_progress);
     }
 
