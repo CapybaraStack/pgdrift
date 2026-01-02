@@ -38,25 +38,36 @@ impl SamplingStrategy {
             _ => crate::discovery::get_row_count(pool, schema, table).await?,
         };
 
+        // Cap sample_size at actual row count to avoid duplicate sampling
+        let effective_sample_size = sample_size.min(row_count as usize);
+
         Ok(match row_count {
-            n if n < 100_000 => Self::Random { limit: sample_size },
+            n if n < 100_000 => Self::Random {
+                limit: effective_sample_size,
+            },
             n if n < 10_000_000 => {
                 // try to find pk for Reservoir sampling
                 match find_primary_key(pool, schema, table).await {
-                    Ok(pk) => Self::ReservoirPK { sample_size, pk },
+                    Ok(pk) => Self::ReservoirPK {
+                        sample_size: effective_sample_size,
+                        pk,
+                    },
                     Err(_) => {
                         // Fallback to random pk
-                        Self::Random { limit: sample_size }
+                        Self::Random {
+                            limit: effective_sample_size,
+                        }
                     }
                 }
             }
             _ => {
                 // for very large tables
                 // Cap percentage at 100.0 (PostgreSQL limit) and minimum 0.1
-                let pct = (sample_size as f32 / row_count as f32 * 100.0).clamp(0.1, 100.0);
+                let pct =
+                    (effective_sample_size as f32 / row_count as f32 * 100.0).clamp(0.1, 100.0);
                 Self::TableSample {
                     percentage: pct,
-                    limit: sample_size,
+                    limit: effective_sample_size,
                 }
             }
         })

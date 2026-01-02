@@ -120,6 +120,331 @@ pub struct AnalysisResult {
     pub drift_issues: Vec<DriftIssue>,
 }
 
+pub struct ColumnScanResult {
+    pub schema: String,
+    pub table: String,
+    pub column: String,
+    pub samples_analyzed: u64,
+    pub drift_issues: Vec<DriftIssue>,
+}
+
+pub struct ScanAllResult {
+    pub total_columns: usize,
+    pub column_results: Vec<ColumnScanResult>,
+}
+
+#[derive(Tabled)]
+pub struct ScanAllRow {
+    #[tabled(rename = "Schema")]
+    pub schema: String,
+    #[tabled(rename = "Table")]
+    pub table: String,
+    #[tabled(rename = "Column")]
+    pub column: String,
+    #[tabled(rename = "Samples")]
+    pub samples: String,
+    #[tabled(rename = "Critical")]
+    pub critical: String,
+    #[tabled(rename = "Warning")]
+    pub warning: String,
+    #[tabled(rename = "Info")]
+    pub info: String,
+    #[tabled(rename = "Total Issues")]
+    pub total: String,
+}
+
+impl From<&ColumnScanResult> for ScanAllRow {
+    fn from(result: &ColumnScanResult) -> Self {
+        let critical = result
+            .drift_issues
+            .iter()
+            .filter(|i| i.severity() == Severity::Critical)
+            .count();
+        let warning = result
+            .drift_issues
+            .iter()
+            .filter(|i| i.severity() == Severity::Warning)
+            .count();
+        let info = result
+            .drift_issues
+            .iter()
+            .filter(|i| i.severity() == Severity::Info)
+            .count();
+        let total = result.drift_issues.len();
+
+        Self {
+            schema: result.schema.clone(),
+            table: result.table.clone(),
+            column: result.column.clone(),
+            samples: result.samples_analyzed.to_string(),
+            critical: critical.to_string(),
+            warning: warning.to_string(),
+            info: info.to_string(),
+            total: total.to_string(),
+        }
+    }
+}
+
+pub fn print_scan_all_summary(result: &ScanAllResult, format: &OutputFormat) -> anyhow::Result<()> {
+    match format {
+        OutputFormat::Table => print_scan_all_table(result),
+        OutputFormat::Json => print_scan_all_json(result),
+        OutputFormat::Markdown => print_scan_all_markdown(result),
+    }
+    Ok(())
+}
+
+fn print_scan_all_json(result: &ScanAllResult) {
+    let total_samples: u64 = result
+        .column_results
+        .iter()
+        .map(|r| r.samples_analyzed)
+        .sum();
+    let total_critical: usize = result
+        .column_results
+        .iter()
+        .flat_map(|r| &r.drift_issues)
+        .filter(|i| i.severity() == Severity::Critical)
+        .count();
+    let total_warning: usize = result
+        .column_results
+        .iter()
+        .flat_map(|r| &r.drift_issues)
+        .filter(|i| i.severity() == Severity::Warning)
+        .count();
+    let total_info: usize = result
+        .column_results
+        .iter()
+        .flat_map(|r| &r.drift_issues)
+        .filter(|i| i.severity() == Severity::Info)
+        .count();
+
+    let output = json!({
+        "total_columns": result.total_columns,
+        "total_samples": total_samples,
+        "summary": {
+            "total_issues": total_critical + total_warning + total_info,
+            "critical": total_critical,
+            "warning": total_warning,
+            "info": total_info,
+        },
+        "columns": result.column_results.iter().map(|col| {
+            json!({
+                "schema": col.schema,
+                "table": col.table,
+                "column": col.column,
+                "samples_analyzed": col.samples_analyzed,
+                "drift_issues": col.drift_issues,
+                "issue_counts": {
+                    "critical": col.drift_issues.iter().filter(|i| i.severity() == Severity::Critical).count(),
+                    "warning": col.drift_issues.iter().filter(|i| i.severity() == Severity::Warning).count(),
+                    "info": col.drift_issues.iter().filter(|i| i.severity() == Severity::Info).count(),
+                }
+            })
+        }).collect::<Vec<_>>(),
+    });
+    println!("{}", serde_json::to_string_pretty(&output).unwrap());
+}
+
+fn print_scan_all_markdown(result: &ScanAllResult) {
+    println!("# Scan All Results\n");
+    println!("**Total columns scanned:** {}\n", result.total_columns);
+
+    let total_samples: u64 = result
+        .column_results
+        .iter()
+        .map(|r| r.samples_analyzed)
+        .sum();
+    let total_critical: usize = result
+        .column_results
+        .iter()
+        .flat_map(|r| &r.drift_issues)
+        .filter(|i| i.severity() == Severity::Critical)
+        .count();
+    let total_warning: usize = result
+        .column_results
+        .iter()
+        .flat_map(|r| &r.drift_issues)
+        .filter(|i| i.severity() == Severity::Warning)
+        .count();
+    let total_info: usize = result
+        .column_results
+        .iter()
+        .flat_map(|r| &r.drift_issues)
+        .filter(|i| i.severity() == Severity::Info)
+        .count();
+
+    println!("## Summary\n");
+    println!("- Total samples analyzed: {}", total_samples);
+    println!(
+        "- Total issues found: {} ({} critical, {} warning, {} info)\n",
+        total_critical + total_warning + total_info,
+        total_critical,
+        total_warning,
+        total_info
+    );
+
+    println!("## Column Details\n");
+    println!("| Schema | Table | Column | Samples | Critical | Warning | Info | Total |");
+    println!("|--------|-------|--------|---------|----------|---------|------|-------|");
+    for col in &result.column_results {
+        let critical = col
+            .drift_issues
+            .iter()
+            .filter(|i| i.severity() == Severity::Critical)
+            .count();
+        let warning = col
+            .drift_issues
+            .iter()
+            .filter(|i| i.severity() == Severity::Warning)
+            .count();
+        let info = col
+            .drift_issues
+            .iter()
+            .filter(|i| i.severity() == Severity::Info)
+            .count();
+        println!(
+            "| {} | {} | {} | {} | {} | {} | {} | {} |",
+            col.schema,
+            col.table,
+            col.column,
+            col.samples_analyzed,
+            critical,
+            warning,
+            info,
+            col.drift_issues.len()
+        );
+    }
+}
+
+fn print_scan_all_table(result: &ScanAllResult) {
+    println!(
+        "\n{} - Scanned {} column(s)\n",
+        "Scan All Complete".bold().green(),
+        result.total_columns
+    );
+
+    // Calculate totals
+    let total_samples: u64 = result
+        .column_results
+        .iter()
+        .map(|r| r.samples_analyzed)
+        .sum();
+    let total_critical: usize = result
+        .column_results
+        .iter()
+        .flat_map(|r| &r.drift_issues)
+        .filter(|i| i.severity() == Severity::Critical)
+        .count();
+    let total_warning: usize = result
+        .column_results
+        .iter()
+        .flat_map(|r| &r.drift_issues)
+        .filter(|i| i.severity() == Severity::Warning)
+        .count();
+    let total_info: usize = result
+        .column_results
+        .iter()
+        .flat_map(|r| &r.drift_issues)
+        .filter(|i| i.severity() == Severity::Info)
+        .count();
+    let total_issues = total_critical + total_warning + total_info;
+
+    println!("{}", "Overall Summary:".bold());
+    println!("  Total samples analyzed: {}", total_samples);
+    println!("  Total issues found: {}", total_issues);
+    if total_critical > 0 {
+        println!("    Critical: {}", total_critical.to_string().red());
+    }
+    if total_warning > 0 {
+        println!("    Warning: {}", total_warning.to_string().yellow());
+    }
+    if total_info > 0 {
+        println!("    Info: {}", total_info.to_string().cyan());
+    }
+
+    if result.column_results.is_empty() {
+        println!("\n{}", "No columns analyzed.".yellow());
+        return;
+    }
+
+    println!("\n{}", "Column Details:".bold());
+    let rows: Vec<ScanAllRow> = result.column_results.iter().map(|r| r.into()).collect();
+    let mut table = Table::new(rows);
+    table.with(Style::rounded());
+    println!("{}", table);
+
+    // Highlight columns with critical issues
+    let critical_columns: Vec<&ColumnScanResult> = result
+        .column_results
+        .iter()
+        .filter(|r| {
+            r.drift_issues
+                .iter()
+                .any(|i| i.severity() == Severity::Critical)
+        })
+        .collect();
+
+    if !critical_columns.is_empty() {
+        println!("\n{} Columns with critical issues:", "*".red().bold());
+        for col in critical_columns {
+            println!(
+                "  • {}.{}.{}",
+                col.schema.dimmed(),
+                col.table,
+                col.column.bold()
+            );
+        }
+    }
+
+    // Highlight columns with warnings
+    let warning_columns: Vec<&ColumnScanResult> = result
+        .column_results
+        .iter()
+        .filter(|r| {
+            r.drift_issues
+                .iter()
+                .any(|i| i.severity() == Severity::Warning)
+        })
+        .collect();
+
+    if !warning_columns.is_empty() {
+        println!("\n{} Columns with warnings:", "*".yellow().bold());
+        for col in warning_columns {
+            println!(
+                "  • {}.{}.{}",
+                col.schema.dimmed(),
+                col.table,
+                col.column.bold()
+            );
+        }
+    }
+
+    let info_columns: Vec<&ColumnScanResult> = result
+        .column_results
+        .iter()
+        .filter(|r| {
+            r.drift_issues
+                .iter()
+                .any(|i| i.severity() == Severity::Info)
+        })
+        .collect();
+
+    if !info_columns.is_empty() {
+        println!("\n{} Columns with info issues:", "*".cyan().bold());
+        for col in info_columns {
+            println!(
+                "  • {}.{}.{}",
+                col.schema.dimmed(),
+                col.table,
+                col.column.bold()
+            );
+        }
+    }
+
+    println!();
+}
+
 pub fn print_analysis(result: &AnalysisResult, format: &OutputFormat) {
     match format {
         OutputFormat::Table => print_analysis_table(result),

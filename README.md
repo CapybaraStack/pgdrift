@@ -14,36 +14,62 @@ When you store JSON documents in PostgreSQL JSONB columns, the schema isn't enfo
 - Find sparse fields (optional fields present in 10-80% of records)
 - Detect missing required fields (expected fields present in 80-95% of records)
 - Analyze schema evolution patterns
+- **Generate PostgreSQL index recommendations** for JSONB fields (B-tree, GIN, Partial)
+- **Scan all JSONB columns** at once for database-wide drift analysis
 - Generate reports in multiple formats (table, JSON, markdown)
 
 ## Getting Started
 
 ### Prerequisites
 
-- Rust 1.75 or later
 - PostgreSQL 12 or later
 - Access to a PostgreSQL database with JSONB columns
+- (Optional) Rust 1.75 or later if building from source
 
 ### Installation
 
-Currently, pgdrift must be built from source. Having installed Rust, clone this repository:
+#### Option 1: Install from crates.io (recommended)
+
+```bash
+cargo install pgdrift
+```
+
+This downloads and compiles the latest stable release from crates.io.
+
+#### Option 2: Download pre-built binaries
+
+Download the latest release for your platform from the [GitHub Releases page](https://github.com/capybarastack/pgdrift/releases):
+
+**Linux:**
+```bash
+curl -L https://github.com/capybarastack/pgdrift/releases/latest/download/pgdrift-x86_64-unknown-linux-gnu -o pgdrift
+chmod +x pgdrift
+sudo mv pgdrift /usr/local/bin/
+```
+
+**macOS:**
+```bash
+curl -L https://github.com/capybarastack/pgdrift/releases/latest/download/pgdrift-x86_64-apple-darwin -o pgdrift
+chmod +x pgdrift
+sudo mv pgdrift /usr/local/bin/
+```
+
+**Windows:**
+Download `pgdrift-x86_64-pc-windows-msvc.exe` from the releases page.
+
+#### Option 3: Build from source
+
+Clone the repository and build:
 
 ```bash
 git clone https://github.com/capybarastack/pgdrift.git
 cd pgdrift
-```
-
-### Building
-
-The simplest way to build for development is to use `cargo build`:
-
-```bash
 cargo build --release
 ```
 
-This compiles the binary and places it in `target/release/pgdrift`.
+The compiled binary will be at `target/release/pgdrift`.
 
-For convenience, you can install it to your cargo bin directory:
+Or install directly from the local clone:
 
 ```bash
 cargo install --path crates/pgdrift
@@ -51,7 +77,7 @@ cargo install --path crates/pgdrift
 
 ## Usage
 
-pgdrift provides two main commands: `discover` and `analyze`.
+pgdrift provides four main commands: `discover`, `analyze`, `scan-all`, and `index`.
 
 ### Discovering JSONB Columns
 
@@ -129,6 +155,103 @@ Info:
 │ legacy.deprecated_id │ Info     │ Ghost key: 0.80% present (40/5000 samples)              │
 │ user.nickname        │ Info     │ Sparse field: 45.00% present (2250/5000 samples)        │
 └──────────────────────┴──────────┴─────────────────────────────────────────────────────────┘
+```
+
+### Scanning All JSONB Columns
+
+Analyze all JSONB columns in your database at once:
+
+```bash
+pgdrift scan-all --database-url $DATABASE_URL
+```
+
+This command discovers all JSONB columns and runs drift analysis on each one, providing a summary of issues across your entire database.
+
+**Example output:**
+
+```
+Discovered 3 JSONB columns. Starting analysis...
+
+Analyzing column: public.metadata (table: users)
+Analysis complete for public.users.metadata - Samples Analyzed: 5000, Issues Found: 5 (Critical: 2, Warning: 2, Info: 1)
+
+Analyzing column: public.payload (table: events)
+Analysis complete for public.events.payload - Samples Analyzed: 5000, Issues Found: 12 (Critical: 0, Warning: 4, Info: 8)
+
+Analyzing column: public.context (table: sessions)
+Analysis complete for public.sessions.context - Samples Analyzed: 5000, Issues Found: 0 (Critical: 0, Warning: 0, Info: 0)
+
+Scan All Complete - Scanned 3 column(s)
+
+Overall Summary:
+  Total samples analyzed: 15000
+  Total issues found: 17
+    Critical: 2
+    Warning: 6
+    Info: 9
+
+Column Details:
+╭────────┬──────────┬──────────┬─────────┬──────────┬─────────┬──────┬──────────────╮
+│ Schema │ Table    │ Column   │ Samples │ Critical │ Warning │ Info │ Total Issues │
+├────────┼──────────┼──────────┼─────────┼──────────┼─────────┼──────┼──────────────┤
+│ public │ users    │ metadata │ 5000    │ 2        │ 2       │ 1    │ 5            │
+│ public │ events   │ payload  │ 5000    │ 0        │ 4       │ 8    │ 12           │
+│ public │ sessions │ context  │ 5000    │ 0        │ 0       │ 0    │ 0            │
+╰────────┴──────────┴──────────┴─────────┴──────────┴─────────┴──────┴──────────────╯
+
+* Columns with critical issues:
+  • public.users.metadata
+```
+
+### Generating Index Recommendations
+
+Get PostgreSQL index recommendations for JSONB fields:
+
+```bash
+pgdrift index users metadata --database-url $DATABASE_URL
+```
+
+The index command analyzes field density, cardinality, and access patterns to recommend appropriate index types.
+
+**Example output:**
+
+```
+Index Recommendations for users.metadata
+
+Summary:
+  Total recommendations: 3
+  High priority: 1
+  Medium priority: 2
+
+Recommendations:
+╭─────────────────┬────────────┬──────────┬──────────────────────────────────────────────────────╮
+│ Field Path      │ Index Type │ Priority │ Reason                                               │
+├─────────────────┼────────────┼──────────┼──────────────────────────────────────────────────────┤
+│ user.email      │ B-tree     │ High     │ High density (98.5%), scalar type (string)           │
+│ user.tags       │ GIN        │ Medium   │ Array type, suitable for containment queries         │
+│ prefs.theme     │ Partial    │ Medium   │ Low density (15.2%), create index WHERE field exists │
+╰─────────────────┴────────────┴──────────┴──────────────────────────────────────────────────────╯
+
+SQL Commands:
+
+1 - user.email
+-- High density scalar field - B-tree index recommended
+CREATE INDEX idx_users_metadata_user_email
+  ON users ((metadata->'user'->>'email'));
+Benefit: Speeds up equality and range queries on user.email
+
+2 - user.tags
+-- Array field - GIN index recommended for containment queries
+CREATE INDEX idx_users_metadata_user_tags
+  ON users USING GIN ((metadata->'user'->'tags'));
+Benefit: Enables fast @>, @<, && containment queries on arrays
+
+3 - prefs.theme
+-- Sparse field - Partial index recommended
+CREATE INDEX idx_users_metadata_prefs_theme
+  ON users ((metadata->'prefs'->>'theme'))
+  WHERE metadata->'prefs'->>'theme' IS NOT NULL;
+Benefit: Reduces index size by only indexing rows where field exists
 ```
 
 ### Output Formats
@@ -257,8 +380,8 @@ cargo test -p pgdrift
 
 Current test suite includes:
 
-- **84 total tests** (38 unit tests + 46 integration tests)
-- Unit tests for JSON analysis, drift detection, sampling strategies, and field categorization
+- **149 total tests** (88 unit tests + 61 integration tests)
+- Unit tests for JSON analysis, drift detection, sampling strategies, index recommendations, and field categorization
 - Integration tests against real PostgreSQL databases using testcontainers
 - Edge case testing for SQL injection, Unicode handling, extreme nesting, and mixed types
 
@@ -268,6 +391,8 @@ Run integration tests separately:
 cargo test --test integration_test
 cargo test --test analyze_integration_test
 cargo test --test discover_integration_test
+cargo test --test index_integration_test
+cargo test --test scan_all_integration_test
 ```
 
 Integration tests automatically spin up PostgreSQL containers and populate them with fixture data representing common drift scenarios.
@@ -353,9 +478,18 @@ Total: ~5 seconds
 
 ## Roadmap
 
-pgdrift is under active development. Planned features:
+pgdrift is under active development. Completed and planned features:
 
-- Index recommendation engine for high-density fields
+**v0.1.0 - Released** ✅
+
+- ✅ JSONB column discovery
+- ✅ Drift detection and analysis
+- ✅ Index recommendation engine
+- ✅ Scan-all command for database-wide analysis
+- ✅ Multiple output formats (table, JSON, markdown)
+
+**Future Releases**
+
 - CI/CD integration mode for drift detection in pipelines
 - Migration SQL generation (Pro feature)
 - Web dashboard for visual analysis
