@@ -248,8 +248,10 @@ async fn find_primary_key(pool: &PgPool, schema: &str, table: &str) -> Result<St
           SELECT a.attname
           FROM pg_index i
           JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+          JOIN pg_type t ON t.oid = a.atttypid
           WHERE i.indrelid = ($1 || '.' || $2)::regclass
             AND i.indisprimary
+            AND t.typcategory = 'N'
           LIMIT 1
           "#,
     )
