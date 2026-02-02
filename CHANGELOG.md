@@ -5,6 +5,27 @@ All notable changes to pgdrift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-02-02
+
+### Fixed
+
+- **Text-based primary key support** ([#5](https://github.com/CapybaraStack/pgdrift/issues/5))
+  - Fixed reservoir sampling failure when table uses text, varchar, or UUID primary keys
+  - Modified primary key detection to only select numeric types for reservoir sampling
+  - Tables with non-numeric primary keys now automatically fall back to random sampling
+  - Added integration test for text-based primary key scenarios
+
+- **TLS/SSL connection support** ([#4](https://github.com/CapybaraStack/pgdrift/issues/4))
+  - Added TLS support for secure PostgreSQL connections
+  - Enabled `tls-rustls` feature in sqlx dependency
+  - Now supports SSL-required production databases
+
+### Contributors
+
+Huge thanks to [@pdeaudney](https://github.com/pdeaudney) for contributing both of these fixes. See [PR #6](https://github.com/CapybaraStack/pgdrift/pull/6).
+
+---
+
 ## [0.1.0] - 2026-01-02
 
 ### Added
