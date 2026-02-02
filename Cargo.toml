@@ -28,7 +28,7 @@ sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "json", "tls-
 # CLI
 clap = { version = "4", features = ["derive", "env"] }
 tabled = "0.20"       # ASCII tables
-colored = "3.0"       # Terminal colors
+colored = "3.1"       # Terminal colors
 indicatif = "0.18"    # Progress bars
 
 # JSON
