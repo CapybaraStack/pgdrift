@@ -23,7 +23,7 @@ pgdrift-core = { version = "0.1.0-rc.1", path = "crates/pgdrift-core" }
 pgdrift-db = { version = "0.1.0-rc.1", path = "crates/pgdrift-db" }
 
 # Database
-sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "json"] }
+sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "json", "tls-rustls"] }
 
 # CLI
 clap = { version = "4", features = ["derive", "env"] }

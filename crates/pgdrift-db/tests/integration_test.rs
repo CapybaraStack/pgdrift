@@ -272,3 +272,63 @@ async fn test_sampler_handles_null_values() {
 
     test_db.cleanup().await.expect("Failed to cleanup");
 }
+
+#[tokio::test]
+async fn test_sampler_with_text_primary_key() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    // Create table with TEXT primary key to test fallback from ReservoirPK to Random
+    sqlx::query(
+        "CREATE TABLE test_text_pk (
+            slug TEXT PRIMARY KEY,
+            metadata JSONB NOT NULL
+        )",
+    )
+    .execute(&test_db.pool)
+    .await
+    .expect("Failed to create table");
+
+    // Insert some test data
+    for i in 0..100 {
+        sqlx::query("INSERT INTO test_text_pk (slug, metadata) VALUES ($1, $2)")
+            .bind(format!("item-{:04}", i))
+            .bind(serde_json::json!({
+                "id": i,
+                "name": format!("Item {}", i),
+                "value": i * 10
+            }))
+            .execute(&test_db.pool)
+            .await
+            .expect("Failed to insert data");
+    }
+
+    // Simulate medium-sized table (would trigger ReservoirPK if PK was numeric)
+    // With text PK, should fallback to Random strategy
+    let sampler = Sampler::new(&test_db.pool, "public", "test_text_pk", Some(500_000), 50)
+        .await
+        .expect("Failed to create sampler");
+
+    let info = sampler.strategy_info();
+    // Should use Random strategy since text PK can't be used for ReservoirPK
+    assert!(
+        info.contains("Random sampling"),
+        "Expected Random strategy for text PK, got: {}",
+        info
+    );
+
+    // Verify sampling actually works without errors
+    let samples = sampler
+        .sample(&test_db.pool, "public", "test_text_pk", "metadata")
+        .await
+        .expect("Failed to sample table with text primary key");
+
+    assert!(!samples.is_empty(), "Expected samples from text PK table");
+    assert!(samples.len() <= 50, "Got more samples than limit");
+
+    // Verify samples are valid JSON
+    for sample in &samples {
+        assert!(sample.is_object(), "Expected JSON object in sample");
+    }
+
+    test_db.cleanup().await.expect("Failed to cleanup");
+}
