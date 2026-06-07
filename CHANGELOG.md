@@ -5,6 +5,27 @@ All notable changes to pgdrift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-06-07
+
+### Security
+
+- **Patched 5 vulnerabilities** flagged by `cargo audit`:
+  - `bytes` 1.11.0 → 1.11.1 — integer overflow / memory corruption in `BytesMut::reserve` (RUSTSEC-2026-0007)
+  - `rustls-webpki` 0.103.8 → 0.103.13 — TLS CRL matching bug (RUSTSEC-2026-0049) and URI name constraint bypass (RUSTSEC-2026-0098)
+  - `time` 0.3.44 → 0.3.47 — denial of service via stack exhaustion (RUSTSEC-2026-0009)
+  - `astral-tokio-tar` 0.5.6 → 0.6.2 — insufficient PAX extension validation (RUSTSEC-2026-0066)
+  - `rand` 0.9.2 → 0.9.4 — unsound with custom logger (RUSTSEC-2026-0097)
+
+### Dependencies
+
+- `testcontainers` 0.26 → 0.27
+- `clap` 4.5.56 → 4.5.60
+- `anyhow` 1.0.100 → 1.0.102
+- `indicatif` 0.18.3 → 0.18.4
+- `softprops/action-gh-release` CI action v2 → v3
+
+---
+
 ## [0.1.1] - 2026-02-02
 
 ### Fixed
